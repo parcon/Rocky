@@ -9,8 +9,8 @@ import os
 
 # --- Page Configuration ---
 st.set_page_config(
-    page_title="Intelligent Running Performance Tracker v2.4",
-    page_icon="🏃‍♂️",
+    page_title="Rocky - Training Tracker",
+    page_icon="🥊",
     layout="wide"
 )
 
@@ -59,19 +59,24 @@ def get_ai_analysis(df):
         next_week_df = df[(df['metric_date'].dt.date > today) & (df['metric_date'].dt.date <= (today + timedelta(days=7)))]
 
         prompt = f"""
-        You are an expert running coach. Analyze the following running data and provide actionable advice.
-        TSB (Training Stress Balance) indicates form. CTL is fitness. ATL is fatigue.
+        You are an expert running coach providing a detailed analysis based on the Performance Management Chart (PMC) model.
 
-        Data from the last 7 days:
+        **Key Metrics:**
+        - **CTL (Fitness):** Chronic Training Load, your long-term fitness. A rising CTL is good.
+        - **ATL (Fatigue):** Acute Training Load, your short-term fatigue. A high ATL means you're tired.
+        - **TSB (Form):** Training Stress Balance (CTL - ATL). Positive TSB means you are fresh (good form). Negative TSB means you are fatigued.
+
+        **Data from the last 7 days:**
         {past_week_df[['metric_date', 'planned_tss', 'actual_tss', 'ctl', 'atl', 'tsb']].to_string()}
 
-        Planned workouts for the next 7 days:
+        **Planned workouts for the next 7 days:**
         {next_week_df[['metric_date', 'planned_tss']].to_string()}
 
-        Based on this data, provide a brief analysis (3-4 sentences) covering:
-        1. Adherence to the plan last week.
-        2. Current form (TSB).
-        3. What to be mindful of for the upcoming week.
+        **Your Task:**
+        Based on all the data provided, provide a brief analysis covering:
+        1.  **Fitness Trend (CTL):** How has the runner's fitness changed over the last week?
+        2.  **Current Fatigue (ATL & TSB):** How tired is the runner right now, and what is their current form?
+        3.  **Adherence & Advice:** How well did they follow the plan last week, and what should they be mindful of for the upcoming week's training?
         """
         response = model.generate_content(prompt)
         return response.text
@@ -80,7 +85,7 @@ def get_ai_analysis(df):
 
 # --- Main Application ---
 def main():
-    st.title("🏃‍♂️ Intelligent Running Performance Tracker")
+    st.title("🥊 Rocky: It Ain't About How Hard Ya Hit...")
     database.init_db()
 
     # --- Sidebar Configuration ---
