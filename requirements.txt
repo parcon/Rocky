@@ -1,0 +1,6 @@
+streamlit
+pandas
+gpxpy
+python-fitparse
+plotly
+google-generativeai
