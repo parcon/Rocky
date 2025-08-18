@@ -4,12 +4,22 @@ from datetime import date
 
 DATABASE_FILE = "data/training.db"
 
-def _add_total_miles_column_if_not_exists(cursor):
-    """Checks for the total_miles column and adds it if it doesn't exist."""
+def _add_schema_columns_if_not_exists(cursor):
+    """Checks for and adds missing columns to tables for backward compatibility."""
+    # Check workouts table
+    cursor.execute("PRAGMA table_info(workouts)")
+    columns = [info[1] for info in cursor.fetchall()]
+    if 'distance_miles' not in columns:
+        cursor.execute("ALTER TABLE workouts ADD COLUMN distance_miles REAL DEFAULT 0")
+    if 'unique_id' not in columns:
+        cursor.execute("ALTER TABLE workouts ADD COLUMN unique_id TEXT") # No default needed, can be NULL
+
+    # Check daily_metrics table
     cursor.execute("PRAGMA table_info(daily_metrics)")
     columns = [info[1] for info in cursor.fetchall()]
     if 'total_miles' not in columns:
         cursor.execute("ALTER TABLE daily_metrics ADD COLUMN total_miles REAL DEFAULT 0")
+
 
 def init_db():
     """Initializes the database and creates/updates tables."""
@@ -20,11 +30,9 @@ def init_db():
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 workout_date TEXT NOT NULL,
                 source_type TEXT NOT NULL,
-                distance_miles REAL,
                 duration_seconds INTEGER,
                 avg_heart_rate INTEGER,
-                tss REAL NOT NULL,
-                unique_id TEXT UNIQUE
+                tss REAL NOT NULL
             )
         """)
         cursor.execute("""
@@ -36,7 +44,7 @@ def init_db():
         """)
         
         # --- Schema Migration ---
-        _add_total_miles_column_if_not_exists(cursor)
+        _add_schema_columns_if_not_exists(cursor)
 
         conn.commit()
 
@@ -45,7 +53,6 @@ def add_workout(workout_data):
     with sqlite3.connect(DATABASE_FILE) as conn:
         cursor = conn.cursor()
         
-        # Use a unique ID to prevent duplicate entries
         unique_id = f"{workout_data['workout_date']}-{workout_data.get('duration_seconds', 0)}-{workout_data.get('distance_miles', 0)}"
 
         cursor.execute("""
@@ -61,7 +68,6 @@ def add_workout(workout_data):
             unique_id
         ))
 
-        # Check if insert was successful before updating daily metrics
         if cursor.rowcount > 0:
             workout_date_str = workout_data['workout_date']
             cursor.execute("INSERT OR IGNORE INTO daily_metrics (metric_date) VALUES (?)", (workout_date_str,))
