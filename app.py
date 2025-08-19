@@ -1,3 +1,8 @@
+# app.py
+# Version 3.5
+# Main application file for the Rocky Training Tracker.
+# Fixes tab rendering logic.
+
 import streamlit as st
 import pandas as pd
 import database
@@ -14,9 +19,10 @@ st.set_page_config(
     layout="wide"
 )
 
+# --- Constants ---
+USER_ID = 1 # Default user for stateless persistence
+
 # --- Initialize Session State ---
-if 'pmc_data' not in st.session_state:
-    st.session_state.pmc_data = pd.DataFrame()
 if 'plan_df' not in st.session_state:
     st.session_state.plan_df = pd.DataFrame()
 
@@ -48,23 +54,21 @@ def calculate_pmc(df):
     df['tsb'] = df['ctl'] - df['atl']
     return df
 
-def get_ai_analysis(df):
+def get_ai_analysis(df, context="training"):
     """Generates AI-powered training commentary using the Gemini API."""
     if not model: return "AI analysis is disabled."
-    if df.empty: return "Not enough data for analysis."
+    if context == "training" and df.empty: return "Not enough data for analysis."
 
-    try:
+    prompt = ""
+    if context == "training":
         today = datetime.now().date()
         past_week_df = df[df['metric_date'].dt.date >= (today - timedelta(days=7))]
         next_week_df = df[(df['metric_date'].dt.date > today) & (df['metric_date'].dt.date <= (today + timedelta(days=7)))]
-
         prompt = f"""
-        You are an expert running coach providing a detailed analysis based on the Performance Management Chart (PMC) model.
-
-        **Key Metrics:**
-        - **CTL (Fitness):** Chronic Training Load, your long-term fitness. A rising CTL is good.
-        - **ATL (Fatigue):** Acute Training Load, your short-term fatigue. A high ATL means you're tired.
-        - **TSB (Form):** Training Stress Balance (CTL - ATL). Positive TSB means you are fresh (good form). Negative TSB means you are fatigued.
+        You are an expert running coach providing a detailed analysis based on the PMC model.
+        - CTL (Fitness): Your long-term fitness.
+        - ATL (Fatigue): Your short-term fatigue.
+        - TSB (Form): Training Stress Balance (CTL - ATL). Positive is fresh, negative is fatigued.
 
         **Data from the last 7 days:**
         {past_week_df[['metric_date', 'planned_tss', 'actual_tss', 'ctl', 'atl', 'tsb']].to_string()}
@@ -73,11 +77,26 @@ def get_ai_analysis(df):
         {next_week_df[['metric_date', 'planned_tss']].to_string()}
 
         **Your Task:**
-        Based on all the data provided, provide a brief analysis covering:
-        1.  **Fitness Trend (CTL):** How has the runner's fitness changed over the last week?
-        2.  **Current Fatigue (ATL & TSB):** How tired is the runner right now, and what is their current form?
-        3.  **Adherence & Advice:** How well did they follow the plan last week, and what should they be mindful of for the upcoming week's training?
+        Provide a brief analysis covering: Fitness Trend (CTL), Current Fatigue (ATL & TSB), and Adherence & Advice.
         """
+    elif context == "weather":
+        prompt = f"""
+        You are an expert running coach. Given the weather forecast and a planned workout with different pace targets, provide a short, actionable tip (2-3 sentences) on how to adjust the run.
+
+        **Weather Forecast:**
+        - Condition: {df['condition']}
+        - High Temperature: {df['high_temp']}°F
+        - Humidity: {df['humidity']}%
+
+        **Planned Workout:**
+        - Description: {df['workout_desc']}
+        - Target Paces: {df['paces']}
+
+        **Your Task:**
+        Provide a specific recommendation on how to adjust the target paces due to the weather. For example, "For your Threshold pace portions, consider adding 5-10 seconds per mile. Keep the Easy pace sections truly easy and focus on hydration."
+        """
+
+    try:
         response = model.generate_content(prompt)
         return response.text
     except Exception as e:
@@ -88,27 +107,54 @@ def main():
     st.title("🥊 Rocky: It Ain't About How Hard Ya Hit...")
     database.init_db()
 
-    # --- Sidebar Configuration ---
     st.sidebar.header("⚙️ Configuration")
-    vdot_lthr = st.sidebar.number_input("VDOT / LTHR (used for TSS calculation)", min_value=100, max_value=220, value=175)
-    st.sidebar.info("This value is used as your LTHR to calculate TSS. Estimate it in the 'Health Metrics' tab.")
+    
+    initial_lthr = database.get_setting(USER_ID, 'lthr')
+    if initial_lthr is None:
+        initial_lthr = 175
+        database.set_setting(USER_ID, 'lthr', initial_lthr)
+    
+    initial_vdot = database.get_setting(USER_ID, 'vdot')
+    if initial_vdot is None:
+        initial_vdot = 50
+        database.set_setting(USER_ID, 'vdot', initial_vdot)
 
-    # --- Load Initial Data ---
-    if st.session_state.pmc_data.empty:
-        all_metrics_df = database.get_all_metrics()
-        st.session_state.pmc_data = calculate_pmc(all_metrics_df)
+    def update_settings():
+        database.set_setting(USER_ID, 'lthr', st.session_state.lthr_input)
+        database.set_setting(USER_ID, 'vdot', st.session_state.vdot_input)
 
-    # --- Main App Tabs ---
-    tab1, tab2, tab3 = st.tabs(["📊 Performance Analysis", "📅 Training Plan", "❤️ Health Metrics"])
+    vdot = st.sidebar.number_input(
+        "VDOT Score", 
+        min_value=30, max_value=85, 
+        value=int(initial_vdot),
+        key='vdot_input',
+        on_change=update_settings
+    )
+    lthr = st.sidebar.number_input(
+        "LTHR (Lactate Threshold Heart Rate)", 
+        min_value=100, max_value=220, 
+        value=int(initial_lthr),
+        key='lthr_input',
+        on_change=update_settings
+    )
+    st.sidebar.info("Your VDOT score is used for pace calculations. Your LTHR is used for TSS calculations from heart rate.")
 
+    # --- Single Source of Truth for Data Loading ---
+    all_metrics_df = database.get_all_metrics(USER_ID)
+    st.session_state.pmc_data = calculate_pmc(all_metrics_df)
+
+    tab1, tab2, tab3, tab4, tab5 = st.tabs(["📊 Performance Analysis", "📅 Training Plan", "🌦️ Weather", "❤️ Health Metrics", "✅ Tests"])
+    
     with tab1:
-        ui_components.render_performance_analysis_tab(vdot_lthr)
-
+        ui_components.render_performance_analysis_tab(lthr, USER_ID)
     with tab2:
-        ui_components.render_training_plan_tab(get_ai_analysis)
-
+        ui_components.render_training_plan_tab(get_ai_analysis, USER_ID)
     with tab3:
+        ui_components.render_weather_tab(vdot, USER_ID)
+    with tab4:
         ui_components.render_health_metrics_tab()
+    with tab5:
+        ui_components.render_tests_tab()
 
 if __name__ == "__main__":
     main()
