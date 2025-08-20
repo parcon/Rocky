@@ -1,96 +1,62 @@
 ### **Rocky: Training Tracker - Project Plan & User Guide**
 
 **Author:** Gemini & Parker Conroy
-**Date:** August 17, 2025
-**Version:** 2.7 (Rocky Edition)
+**Date:** August 19, 2025
+**Version:** 3.5
 
----
+### **1. Features**
 
-### **1. Product Vision & Requirements (PRD)**
+"Rocky" is a high-performance training tracker that provides a centralized platform to analyze historical workout data, track performance against a future training plan, and receive AI-powered insights.
 
-#### **1.1. Purpose and Vision**
+* **Historical Performance Analysis**:
+  * **Bulk Data Ingestion**: Upload your entire workout history from multiple `.csv`, `.gpx`, and `.fit` files.
+  * **Performance Management Chart (PMC)**: Visualize the interplay of your Fitness (CTL), Fatigue (ATL), and Form (TSB) over time.
 
-"Rocky" is a high-performance training tracker designed for dedicated runners. The application provides a centralized, intelligent platform to analyze historical workout data, track performance against a future training plan, and receive AI-powered insights to optimize training and stay motivated.
+* **Training Plan Tracking**:
+  * **Plan Ingestion**: Parse detailed training plan CSVs to forecast future workout load.
+  * **Training Readiness**: Get immediate feedback on your readiness for a new training block by comparing your current fitness to a projection of your form after the first workout.
+  * **Projected Fitness**: View a chart forecasting your fitness (CTL) progression based on your uploaded plan.
 
-#### **1.2. Core Features**
+* **Weather-Aware Coaching**:
+  * **Weekly Forecast**: See a 7-day weather forecast for Austin, TX.
+  * **Pace Adjustments**: Get specific, weather-adjusted pace targets for your next run based on a formula that accounts for heat and humidity.
 
-* **(FR-1) Historical Performance Analysis:**
-    * **Bulk Data Ingestion:** Users can upload their entire workout history via multiple `.csv`, `.gpx`, and `.fit` files.
-    * **Performance Management Chart (PMC):** The app calculates and displays a complete PMC, showing the interplay of Fitness (CTL), Fatigue (ATL), and Form (TSB) over time.
+* **Health Metrics & Diagnostics**:
+  * **LTHR Estimation**: Estimate your Lactate Threshold Heart Rate (LTHR) by uploading a workout CSV.
+  * **Stateless Persistence**: Your VDOT and LTHR settings are saved automatically between sessions without requiring a login.
+  * **App Health Check**: A dedicated "Tests" tab to run diagnostic checks on the application's core components.
 
-* **(FR-2) Training Plan Tracking:**
-    * **Plan Ingestion:** Parses detailed training plan CSVs to understand future workout load.
-    * **Training Readiness:** Calculates the user's projected form (TSB) for the first workout of the plan, providing immediate feedback on whether they are starting fresh, fatigued, or in an optimal state.
-    * **Projected Fitness:** Displays a chart forecasting the user's fitness (CTL) progression based on the uploaded plan.
+### **2. System Architecture**
 
-* **(FR-3) Health Metrics & AI Analysis:**
-    * **LTHR Estimation:** Ingests a workout CSV to provide an estimated Lactate Threshold Heart Rate (LTHR), a key metric for calculating training stress.
-    * **AI-Powered Coaching:** Uses the Gemini API to provide detailed, contextual analysis of the user's fitness, fatigue, form, and adherence to their plan.
+The application is built with a modular and maintainable structure.
 
----
-
-### **2. Software & System Requirements (SRD)**
-
-#### **2.1. System Architecture**
-
-* **Frontend:** A web interface built using **Streamlit**, with UI components separated into `ui_components.py`.
-* **Backend / Core Logic:** A Python engine (`app.py`, `parsers.py`) containing all business logic.
-* **Data Storage:** A local **SQLite** database file (`training.db`) managed by `database.py`.
-
-#### **2.2. Technology Stack**
-
-* **Language:** Python 3.9+
-* **Framework:** Streamlit
-* **Data Manipulation:** Pandas
-* **File Parsing:** `gpxpy`, `python-fitparse`
-* **Database:** `sqlite3`
-* **Visualization:** Plotly
-* **AI Integration:** Google Gemini API (`gemini-2.5-flash-lite`)
-
----
+* **`app.py` (Core Logic)**: The main application file that handles state management, core calculations, and orchestrates the different components.
+* **`ui_components.py` (Frontend)**: Contains the rendering logic for each of the application's tabs.
+* **`database.py` (Data Storage)**: Manages a local **SQLite** database (`training.db`) with support for a single, persistent user profile.
+* **`parsers.py` (Data Ingestion)**: Contains the functions for parsing various file types (`.csv`, `.gpx`, `.fit`).
+* **`tests.py` (Testing)**: Provides unit tests for the application's core functionality.
 
 ### **3. User Instructions**
 
 #### **3.1. Setup and Installation**
 
 **Step 1: Create a Virtual Environment (Recommended)**
-
-```bash
-# For macOS/Linux
-python3 -m venv venv
-source venv/bin/activate
-
-# For Windows
-python -m venv venv
-venv\Scripts\activate
-```
-
+For macOS/Linuxpython3 -m venv venvsource venv/bin/activateFor Windowspython -m venv venvvenv\Scripts\activate
 **Step 2: Install Dependencies**
-
-```bash
 pip install -r requirements.txt
-```
-
 **Step 3: Set Up Gemini API Key**
-1.  Obtain a Gemini API key from the [Google AI Studio](https://aistudio.google.com/app/apikey).
-2.  In your project folder, create a new directory named `.streamlit`.
-3.  Inside `.streamlit`, create a file named `secrets.toml`.
-4.  Add your API key to the `secrets.toml` file:
-
-    ```toml
-    GEMINI_API_KEY = "YOUR_API_KEY_HERE"
-    ```
-
+1. Obtain a Gemini API key from the [Google AI Studio](https://aistudio.google.com/app/apikey).
+2. In your project folder, create a new directory named `.streamlit`.
+3. Inside `.streamlit`, create a file named `secrets.toml`.
+4. Add your API key to the `secrets.toml` file:
+GEMINI_API_KEY = "YOUR_API_KEY_HERE"
 #### **3.2. How to Run the Application**
-
-```bash
 streamlit run app.py
-```
-
 #### **3.3. How to Use the Application**
-
-1.  **Estimate LTHR**: Go to the **Health Metrics** tab. Upload your `Workouts - Workouts.csv` or `Workouts - Heart Rate v pace.csv` file to get an estimated LTHR.
-2.  **Configure**: Update the **VDOT / LTHR** value in the sidebar with your new estimate.
-3.  **Process History**: Go to the **Performance Analysis** tab. Upload all your workout history files (`Workouts - Workouts.csv`, `.gpx`, `.fit`) to build your historical performance chart.
-4.  **Upload Plan**: Go to the **Training Plan** tab and upload your training plan CSV. This will display your upcoming schedule, your readiness for the plan, and your projected fitness.
-5.  **Get AI Coaching**: Click the "Generate Training Analysis" button for AI-powered feedback.
+1. **Estimate LTHR & VDOT**: Go to the **Health Metrics** tab and upload your `Workouts - Workouts.csv` or `Workouts - Heart Rate v pace.csv` file to get an estimated LTHR.
+2. **Configure**: Update the **VDOT Score** and **LTHR** values in the sidebar. These settings will be saved automatically for your next session.
+3. **Process History**: Go to the **Performance Analysis** tab and upload all your workout history files to build your historical performance chart.
+4. **Upload Plan**: Go to the **Training Plan** tab and upload your training plan CSV. This will display your upcoming schedule, your readiness for the plan, and your projected fitness.
+5. **Get Weather Advice**: Navigate to the **Weather** tab to see the forecast and AI-powered pace adjustments for your next run.
+6. **Get AI Coaching**: In the **Training Plan** tab, click the "Generate Training Analysis" button for AI-powered feedback on your overall progress.
+7. **Run Diagnostics**: If you encounter issues, use the **Tests** tab to check the application's health.
