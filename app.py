@@ -1,7 +1,6 @@
 # app.py
-# Version 3.5
-# Main application file for the Rocky Training Tracker.
-# Fixes tab rendering logic.
+# Version 4.1
+# Adds a new AI context for a weekly weather and fatigue analysis.
 
 import streamlit as st
 import pandas as pd
@@ -79,21 +78,29 @@ def get_ai_analysis(df, context="training"):
         **Your Task:**
         Provide a brief analysis covering: Fitness Trend (CTL), Current Fatigue (ATL & TSB), and Adherence & Advice.
         """
-    elif context == "weather":
+    elif context == "weather_weekly":
+        current_atl = df.get('atl', 'N/A')
+        upcoming_runs = df.get('runs', pd.DataFrame()).to_string()
+        weather_forecast = df.get('weather', [])
+
+        weather_str = ""
+        for day in weather_forecast:
+            weather_str += f"- {day['day']}, {day['date']}: {day['condition']}, Low {day['low']}°F, High {day['high']}°F, Humidity {day['humidity']}%\n"
+
         prompt = f"""
-        You are an expert running coach. Given the weather forecast and a planned workout with different pace targets, provide a short, actionable tip (2-3 sentences) on how to adjust the run.
+        You are an expert running coach analyzing a runner's upcoming week in Austin, TX.
+
+        **Current Athlete Status:**
+        - Current ATL (Fatigue): {current_atl:.1f}
+
+        **Upcoming Planned Runs for the Rest of the Week:**
+        {upcoming_runs}
 
         **Weather Forecast:**
-        - Condition: {df['condition']}
-        - High Temperature: {df['high_temp']}°F
-        - Humidity: {df['humidity']}%
-
-        **Planned Workout:**
-        - Description: {df['workout_desc']}
-        - Target Paces: {df['paces']}
+        {weather_str}
 
         **Your Task:**
-        Provide a specific recommendation on how to adjust the target paces due to the weather. For example, "For your Threshold pace portions, consider adding 5-10 seconds per mile. Keep the Easy pace sections truly easy and focus on hydration."
+        Provide a brief, actionable analysis (3-4 sentences) for the remainder of the week. Consider the runner's current fatigue (ATL) and the hot weather forecast. Advise on potential adjustments to run length or intensity to balance training goals with recovery and heat safety. For example, if ATL is high and it's hot, you might suggest focusing on hydration, running early, and maybe shortening the long run slightly.
         """
 
     try:
@@ -145,10 +152,9 @@ def main():
 
     tab1, tab2, tab3, tab4, tab5 = st.tabs(["📊 Performance Analysis", "📅 Training Plan", "🌦️ Weather", "❤️ Health Metrics", "✅ Tests"])
     
-    # --- FIX: Pass the tab object as the first argument to each render function ---
     ui_components.render_performance_analysis_tab(tab1, lthr, USER_ID)
     ui_components.render_training_plan_tab(tab2, get_ai_analysis, USER_ID)
-    ui_components.render_weather_tab(tab3, vdot, USER_ID)
+    ui_components.render_weather_tab(tab3, vdot, USER_ID, get_ai_analysis)
     ui_components.render_health_metrics_tab(tab4)
     ui_components.render_tests_tab(tab5)
 
