@@ -1,17 +1,21 @@
 # ui_components.py
-# Version 3.4
-# Contains functions for rendering the different tabs in the Streamlit UI.
-# Fixes plot display issue with st.rerun().
+# Version 3.8
+# Refactors helper functions into utils.py to resolve circular import error.
 
 import streamlit as st
 import pandas as pd
 import database
 import parsers
-import tests
 import plotly.graph_objects as go
 from datetime import datetime, timedelta
 import os
 import re
+# --- UPDATED: Import utility functions from the new utils.py file ---
+from utils import (
+    calculate_dew_point, 
+    adjust_pace_for_weather, 
+    get_pace_from_vdot
+)
 
 # Mock weather data for Austin, TX as a fallback
 MOCK_WEATHER_DATA = [
@@ -24,13 +28,23 @@ MOCK_WEATHER_DATA = [
     {'day': 'Mon', 'date': 'Aug 25', 'condition': 'Partly Cloudy', 'high': 92, 'low': 76, 'humidity': 60},
 ]
 
+# --- Helper Functions specific to UI ---
+def seconds_to_pace_str(seconds):
+    minutes = int(seconds // 60)
+    secs = int(seconds % 60)
+    return f"{minutes}:{secs:02d}"
+
 def get_weather_icon(condition):
-    """Returns an emoji icon for a given weather condition."""
     condition = condition.lower()
     if 'sun' in condition: return '☀️'
     if 'cloud' in condition: return '☁️'
     if 'rain' in condition or 'storm' in condition: return '🌧️'
     return '🌡️'
+
+def get_target_paces_from_description(description):
+    if not isinstance(description, str): return []
+    paces = re.findall(r'\b([EMTIR])\b', description.upper())
+    return sorted(set(paces), key=paces.index)
 
 def calculate_projected_pmc(plan_df, initial_ctl=0, initial_atl=0):
     if plan_df.empty: return pd.DataFrame()
@@ -50,6 +64,7 @@ def calculate_projected_pmc(plan_df, initial_ctl=0, initial_atl=0):
     proj_df['tsb'] = proj_df['ctl'] - proj_df['atl']
     return proj_df
 
+# --- Tab Rendering Functions ---
 def render_performance_analysis_tab(tab, lthr, user_id):
     with tab:
         st.header("Historical Performance Analysis")
@@ -71,8 +86,6 @@ def render_performance_analysis_tab(tab, lthr, user_id):
                     st.success("Processing complete.")
                     if errors:
                         st.error("Some files failed:\n\n" + "\n".join(str(e) for e in errors))
-                
-                # FIX: Force a rerun to reload data and update the plot
                 st.rerun()
 
         st.subheader("3. View Your Performance Chart")
@@ -163,7 +176,7 @@ def render_training_plan_tab(tab, get_ai_analysis_func, user_id):
 def render_weather_tab(tab, vdot, user_id):
     with tab:
         st.header("Weather-Adjusted Pace Guide")
-        
+
         if st.session_state.plan_df.empty:
             st.warning("Upload a training plan on the 'Training Plan' tab to get weather-based advice.")
             return
@@ -172,47 +185,53 @@ def render_weather_tab(tab, vdot, user_id):
         plan_df['Date'] = pd.to_datetime(plan_df['Date'])
         
         today = datetime.now().date()
-        future_plan = plan_df[plan_df['Date'].dt.date >= today]
-        
+        future_plan = plan_df[plan_df['Date'].dt.date >= today].head(3)
+
         if future_plan.empty:
             st.info("No upcoming runs found in your training plan.")
             return
             
-        next_run = future_plan.iloc[0]
-        next_run_date = next_run['Date'].date()
-        
-        weather_forecast = MOCK_WEATHER_DATA[0]
-        for forecast in MOCK_WEATHER_DATA:
-            if datetime.strptime(f"{forecast['date']} 2025", "%b %d %Y").date() == next_run_date:
-                weather_forecast = forecast
-                break
-        
-        st.subheader(f"Next Run: {next_run_date.strftime('%A, %b %d')}")
-        
-        col1, col2 = st.columns(2)
-        with col1:
-            st.markdown(f"#### {get_weather_icon(weather_forecast['condition'])} {weather_forecast['high']}°F")
-            st.caption(f"Low: {weather_forecast['low']}°F | Humidity: {weather_forecast['humidity']}%")
-        with col2:
-            st.markdown(f"#### {next_run['Original_Description']}")
-            st.caption(f"{next_run['Total_Miles']} miles")
-
         st.markdown("---")
-        
-        target_paces = get_target_paces_from_description(next_run['Original_Description'])
-        
-        st.subheader("Pace Targets & Adjustments")
-        cols = st.columns(len(target_paces))
-        
-        for i, pace_type in enumerate(target_paces):
-            with cols[i]:
-                st.markdown(f"##### {pace_type}")
-                base_pace_seconds = get_pace_from_vdot(vdot, pace_type)
-                adjusted_pace_seconds = adjust_pace_for_weather(base_pace_seconds, weather_forecast['high'], weather_forecast['humidity'])
-                delta_str = f"+{int(adjusted_pace_seconds - base_pace_seconds)}s"
-                
-                st.metric(label="Target Pace", value=seconds_to_pace_str(base_pace_seconds))
-                st.metric(label="Adjusted Pace", value=seconds_to_pace_str(adjusted_pace_seconds), delta=delta_str, delta_color="inverse")
+
+        for index, next_run in future_plan.iterrows():
+            next_run_date = next_run['Date'].date()
+            
+            weather_forecast = MOCK_WEATHER_DATA[0] # Default
+            for forecast in MOCK_WEATHER_DATA:
+                try:
+                    forecast_date = datetime.strptime(f"{forecast['date']} {datetime.now().year}", "%b %d %Y").date()
+                    if forecast_date == next_run_date:
+                        weather_forecast = forecast
+                        break
+                except ValueError:
+                    continue
+
+            dew_point = calculate_dew_point(weather_forecast['high'], weather_forecast['humidity'])
+            target_paces = get_target_paces_from_description(next_run['Original_Description'])
+
+            col1, col2, col3, col4 = st.columns([1, 1.5, 3, 2])
+
+            with col1:
+                st.markdown(f"**{next_run_date.strftime('%a, %b %d')}**")
+            
+            with col2:
+                st.markdown(f"{get_weather_icon(weather_forecast['condition'])} {weather_forecast['high']}°F (DP: {dew_point:.0f}°F)")
+            
+            with col3:
+                st.markdown(f"**{next_run['Original_Description']}** ({next_run['Total_Miles']} mi)")
+
+            with col4:
+                if not target_paces:
+                    st.caption("No pace targets")
+                else:
+                    pace_strings = []
+                    for pace_type in target_paces:
+                        base_pace = get_pace_from_vdot(vdot, pace_type)
+                        adjusted_pace = adjust_pace_for_weather(base_pace, dew_point)
+                        pace_strings.append(f"{pace_type}: {seconds_to_pace_str(adjusted_pace)} ({seconds_to_pace_str(base_pace)})")
+                    st.markdown(" / ".join(pace_strings))
+            
+            st.markdown("---")
 
 def render_health_metrics_tab(tab):
     with tab:
@@ -235,16 +254,25 @@ def render_tests_tab(tab):
         st.header("✅ App Health Check")
         st.write("Run these tests to confirm all key features of the application are working correctly.")
         if st.button("Run All Tests"):
+            # --- UPDATED: Import tests locally to prevent circular dependency ---
+            import tests
             with st.spinner("Running tests..."):
                 st.subheader("Database Connection")
                 result, message = tests.test_database_connection()
                 if result: st.success("✅ PASSED: Database initialized successfully.")
                 else: st.error(f"❌ FAILED: {message}")
+
                 st.subheader("File Parsers")
                 result, message = tests.test_parsers()
                 if result: st.success("✅ PASSED: All file parsers are working correctly.")
                 else: st.error(f"❌ FAILED: {message}")
+
                 st.subheader("PMC Model")
                 result, message = tests.test_pmc_calculation()
                 if result: st.success("✅ PASSED: PMC calculation model is working correctly.")
+                else: st.error(f"❌ FAILED: {message}")
+
+                st.subheader("Weather Model")
+                result, message = tests.test_weather_adjustments()
+                if result: st.success("✅ PASSED: Weather adjustment model is working correctly.")
                 else: st.error(f"❌ FAILED: {message}")

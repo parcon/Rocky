@@ -29,7 +29,7 @@ if 'plan_df' not in st.session_state:
 # --- Gemini API Configuration ---
 try:
     genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
-    model = genai.GenerativeModel('gemini-2.5-flash-lite')
+    model = genai.GenerativeModel('gemini-1.5-flash')
 except Exception:
     st.warning("Gemini API key not found or invalid. AI analysis will be disabled.")
     model = None
@@ -145,16 +145,12 @@ def main():
 
     tab1, tab2, tab3, tab4, tab5 = st.tabs(["📊 Performance Analysis", "📅 Training Plan", "🌦️ Weather", "❤️ Health Metrics", "✅ Tests"])
     
-    with tab1:
-        ui_components.render_performance_analysis_tab(lthr, USER_ID)
-    with tab2:
-        ui_components.render_training_plan_tab(get_ai_analysis, USER_ID)
-    with tab3:
-        ui_components.render_weather_tab(vdot, USER_ID)
-    with tab4:
-        ui_components.render_health_metrics_tab()
-    with tab5:
-        ui_components.render_tests_tab()
+    # --- FIX: Pass the tab object as the first argument to each render function ---
+    ui_components.render_performance_analysis_tab(tab1, lthr, USER_ID)
+    ui_components.render_training_plan_tab(tab2, get_ai_analysis, USER_ID)
+    ui_components.render_weather_tab(tab3, vdot, USER_ID)
+    ui_components.render_health_metrics_tab(tab4)
+    ui_components.render_tests_tab(tab5)
 
 if __name__ == "__main__":
     main()

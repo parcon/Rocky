@@ -1,12 +1,13 @@
 # tests.py
-# Version 3.2
-# Contains functions to test the core functionality of the application.
+# Version 3.4
+# Imports weather functions from the new utils.py to break the circular dependency.
 
 import pandas as pd
 from io import StringIO
 import database
 import parsers
 from app import calculate_pmc
+from utils import calculate_dew_point, adjust_pace_for_weather # <-- UPDATED IMPORT
 
 # --- Constants ---
 TEST_USER_ID = 99 # A dedicated user ID for testing purposes
@@ -22,16 +23,12 @@ def test_database_connection():
 def test_parsers():
     """Tests the core file parsing functions with in-memory file objects."""
     try:
-        # Test Plan Parser
         plan_csv = "Date,Total_Miles,E_Pace_Miles\n2025-01-01,5.0,5.0"
         plan_file = StringIO(plan_csv)
-        # FIX: Pass the user_id as the first argument
         parsers.parse_and_store_plan(TEST_USER_ID, plan_file)
 
-        # Test Historical Workout CSV Parser
         workout_csv = "Date,Type,Total Time,Distance,Heart Rate\n2025-01-01,Running,0h:30m:00s,3.1,150"
         workout_file = StringIO(workout_csv)
-        # FIX: Pass the user_id as the first argument
         parsers.parse_historical_csv(TEST_USER_ID, workout_file, 175)
         
         return True, "Success"
@@ -54,3 +51,25 @@ def test_pmc_calculation():
         return True, "Success"
     except Exception as e:
         return False, str(e)
+
+def test_weather_adjustments():
+    """Tests the dew point and pace adjustment calculations."""
+    try:
+        # Test dew point calculation
+        dp = calculate_dew_point(temp_f=75, humidity_pct=80)
+        assert 68 < dp < 69, f"Dew point calculation failed. Expected ~68.5, got {dp}"
+
+        # Test pace adjustment below threshold
+        no_adjustment = adjust_pace_for_weather(base_pace_seconds=600, dew_point_f=59)
+        assert no_adjustment == 600, "Pace should not be adjusted below 60°F dew point."
+
+        # Test pace adjustment above threshold
+        adjustment = adjust_pace_for_weather(base_pace_seconds=600, dew_point_f=70)
+        # Expected: 600 * (1 + 0.006 * (70 - 60)) = 600 * 1.06 = 636
+        assert 635 < adjustment < 637, f"Pace adjustment calculation failed. Expected ~636, got {adjustment}"
+
+        return True, "Success"
+    except AssertionError as e:
+        return False, str(e)
+    except Exception as e:
+        return False, f"An unexpected error occurred: {e}"
