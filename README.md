@@ -2,7 +2,7 @@
 
 **Author:** Gemini & Parker Conroy
 **Date:** August 20, 2025
-**Version:** 4.2
+**Version:** 4.3
 
 ### **1. Features**
 
