@@ -2,11 +2,14 @@
 
 **Author:** Gemini & Parker Conroy
 **Date:** August 20, 2025
-**Version:** 4.3
+**Version:** 4.5
 
 ### **1. Features**
 
 "Rocky" is a high-performance training tracker that provides a centralized platform to analyze historical workout data, track performance against a future training plan, and receive AI-powered insights.
+
+* **Motivational GIF**:
+    * Displays a random motivational GIF from the `gifs` folder on each app run to keep you going.
 
 * **Historical Performance Analysis**:
     * **Bulk Data Ingestion**: Upload your entire workout history from multiple `.csv`, `.gpx`, and `.fit` files.
@@ -32,12 +35,13 @@
 
 The application is built with a modular and maintainable structure.
 
-* **`app.py` (Core Logic)**: The main application file that handles state management, core calculations, and orchestrates the different components.
-* **`ui_components.py` (Frontend)**: Contains the rendering logic for each of the application's tabs.
-* **`utils.py` (Shared Functions)**: A utility module for shared calculation functions (like weather adjustments and pace estimations) to prevent circular dependencies.
-* **`database.py` (Data Storage)**: Manages a local **SQLite** database (`training.db`) with support for a single, persistent user profile.
-* **`parsers.py` (Data Ingestion)**: Contains the functions for parsing various file types (`.csv`, `.gpx`, `.fit`).
-* **`tests.py` (Testing)**: Provides unit tests for the application's core functionality.
+* `app.py` (Core Logic): The main application file that handles state management, core calculations, and orchestrates the different components.
+* `ui_components.py` (Frontend): Contains the rendering logic for each of the application's tabs.
+* `utils.py` (Shared Functions): A utility module for shared calculation functions (like weather adjustments and pace estimations) to prevent circular dependencies.
+* `database.py` (Data Storage): Manages a local SQLite database (`training.db`) with support for a single, persistent user profile.
+* `parsers.py` (Data Ingestion): Contains the functions for parsing various file types (`.csv`, `.gpx`, `.fit`).
+* `tests.py` (Testing): Provides unit tests for the application's core functionality.
+* `gifs/` (Image Assets): A folder to store motivational GIFs displayed in the app.
 
 ### **3. User Instructions**
 
@@ -68,6 +72,11 @@ uv pip install -r requirements.txt
     ```toml
     GEMINI_API_KEY = "YOUR_API_KEY_HERE"
     ```
+
+**Step 4: Add Motivational GIFs**
+1.  Create a folder named `gifs` in the main project directory.
+2.  Add any number of `.gif` files to this folder. A random one will be displayed each time you run the app.
+
 
 #### **3.2. How to Run the Application**
 ```bash
