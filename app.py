@@ -1,6 +1,6 @@
 # app.py
-# Version 4.1
-# Adds a new AI context for a weekly weather and fatigue analysis.
+# Version 4.2
+# Adds a motivational GIF to the top of the page.
 
 import streamlit as st
 import pandas as pd
@@ -10,6 +10,7 @@ import ui_components
 from datetime import datetime, timedelta
 import google.generativeai as genai
 import os
+import random
 
 # --- Page Configuration ---
 st.set_page_config(
@@ -33,12 +34,22 @@ except Exception:
     st.warning("Gemini API key not found or invalid. AI analysis will be disabled.")
     model = None
 
+# --- GIF Logic ---
+def get_random_gif():
+    """Gets a random GIF from the 'gifs' directory."""
+    gif_dir = "gifs"
+    if os.path.exists(gif_dir):
+        gifs = [os.path.join(gif_dir, f) for f in os.listdir(gif_dir) if f.endswith(".gif")]
+        if gifs:
+            return random.choice(gifs)
+    return None
+
 # --- Core Logic Functions ---
 def calculate_pmc(df):
     """Calculates the Performance Management Chart (CTL, ATL, TSB) from actual workouts."""
     if df.empty:
         return pd.DataFrame()
-    
+
     df['metric_date'] = pd.to_datetime(df['metric_date'])
     df = df.sort_values('metric_date')
     start_date = df['metric_date'].min()
@@ -111,16 +122,25 @@ def get_ai_analysis(df, context="training"):
 
 # --- Main Application ---
 def main():
-    st.title("🥊 Rocky: It Ain't About How Hard Ya Hit...")
+    random_gif = get_random_gif()
+    if random_gif:
+        col1, col2 = st.columns([4, 1])
+        with col1:
+            st.title("🥊 Rocky: It Ain't About How Hard Ya Hit...")
+        with col2:
+            st.image(random_gif)
+    else:
+        st.title("🥊 Rocky: It Ain't About How Hard Ya Hit...")
+
     database.init_db()
 
     st.sidebar.header("⚙️ Configuration")
-    
+
     initial_lthr = database.get_setting(USER_ID, 'lthr')
     if initial_lthr is None:
         initial_lthr = 175
         database.set_setting(USER_ID, 'lthr', initial_lthr)
-    
+
     initial_vdot = database.get_setting(USER_ID, 'vdot')
     if initial_vdot is None:
         initial_vdot = 50
@@ -131,15 +151,15 @@ def main():
         database.set_setting(USER_ID, 'vdot', st.session_state.vdot_input)
 
     vdot = st.sidebar.number_input(
-        "VDOT Score", 
-        min_value=30, max_value=85, 
+        "VDOT Score",
+        min_value=30, max_value=85,
         value=int(initial_vdot),
         key='vdot_input',
         on_change=update_settings
     )
     lthr = st.sidebar.number_input(
-        "LTHR (Lactate Threshold Heart Rate)", 
-        min_value=100, max_value=220, 
+        "LTHR (Lactate Threshold Heart Rate)",
+        min_value=100, max_value=220,
         value=int(initial_lthr),
         key='lthr_input',
         on_change=update_settings
@@ -151,7 +171,7 @@ def main():
     st.session_state.pmc_data = calculate_pmc(all_metrics_df)
 
     tab1, tab2, tab3, tab4, tab5 = st.tabs(["📊 Performance Analysis", "📅 Training Plan", "🌦️ Weather", "❤️ Health Metrics", "✅ Tests"])
-    
+
     ui_components.render_performance_analysis_tab(tab1, lthr, USER_ID)
     ui_components.render_training_plan_tab(tab2, get_ai_analysis, USER_ID)
     ui_components.render_weather_tab(tab3, vdot, USER_ID, get_ai_analysis)
